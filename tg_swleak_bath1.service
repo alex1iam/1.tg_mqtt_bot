@@ -1,0 +1,15 @@
+[Unit]
+Description=tg_swleak_bath1_bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment=PYTHONPATH=/opt/tg_mqtt_bot
+WorkingDirectory=/opt/tg_mqtt_bot
+ExecStart=/usr/bin/python3 /opt/tg_mqtt_bot/tg_swleak_bath1.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=network.target
