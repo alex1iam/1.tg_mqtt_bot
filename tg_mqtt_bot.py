@@ -2,9 +2,9 @@ import paho.mqtt.client as mqtt
 import telegram
 
 # Токен бота в телеграме
-bot_token = '5499782833:AAFqqw1Tk9omTF3MyMPOf6QX6VyTf6wTxY4'
+bot_token = '1234567890:AAqwertyuioasdfghjklzxcvbn'
 # ID чата
-chat_id = '1455647242'
+chat_id = '0987654321'
 # Создаем бота
 bot = telegram.Bot(token=bot_token)
 # Создаем клиента для MQTT
