@@ -32,3 +32,6 @@ systemctl stop tg_swleak_bath1.service
 
 команда отключения автозагрузки скрипта
 systemctl disable tg_swleak_bath1.service
+
+
+Если нужно запустить несколько скриптов, сделайте копии
