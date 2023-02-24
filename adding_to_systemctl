@@ -1,0 +1,34 @@
+Создается файл /etc/systemd/system/tg_swleak_bath1.service
+В него вносится следующее содержимое и сохраняется:
+
+
+[Unit]
+Description=tg_swleak_bath1_bot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment=PYTHONPATH=/opt/tg_mqtt_bot
+WorkingDirectory=/opt/tg_mqtt_bot
+ExecStart=/usr/bin/python3 /opt/tg_mqtt_bot/tg_swleak_bath1.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=network.target
+
+
+
+
+команда для инициализации автозагрузки скрипта
+systemctl enable tg_swleak_bath1.service
+
+команда запуска скрипта через systemctl
+systemctl start tg_swleak_bath1.service
+
+команда остановки скрипта через systemctl
+systemctl stop tg_swleak_bath1.service
+
+команда отключения автозагрузки скрипта
+systemctl disable tg_swleak_bath1.service
