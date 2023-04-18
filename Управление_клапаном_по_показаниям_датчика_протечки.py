@@ -49,7 +49,7 @@ def on_message(client, userdata, msg):
    # Проверяем, что значение содержимого топика изменилось
     if prev_topic_value != curr_topic_value:
       # Отправляем сообщение в телеграмм о статусе протечки
-      bot.send_message(chat_id=chat_id, text=msg.topic+":: "+mapp_topic_value)
+      bot.send_message(chat_id=chat_id, text=msg.topic+":: "+mapp_topic_value+". Текущее время: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
       # проверяем, что протечка устранена и сообщаем в телеграм
       if curr_topic_value == 'false':
        bot.send_message(chat_id=chat_id, text=msg.topic+":: Отправлена команда открыть горячую воду")
