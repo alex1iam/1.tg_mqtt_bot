@@ -1,9 +1,9 @@
-Создается файл /etc/systemd/system/tg_swleak_bath1.service
+Создается файл /etc/systemd/system/название_скрипта.service
 В него вносится следующее содержимое и сохраняется:
 
 
 [Unit]
-Description=tg_swleak_bath1_bot
+Description=описание_скрипта_bot
 After=network.target
 
 [Service]
@@ -11,7 +11,7 @@ Type=simple
 User=root
 Environment=PYTHONPATH=/opt/tg_mqtt_bot
 WorkingDirectory=/opt/tg_mqtt_bot
-ExecStart=/usr/bin/python3 /opt/tg_mqtt_bot/tg_swleak_bath1.py
+ExecStart=/usr/bin/python3 /opt/tg_mqtt_bot/название_скрипта.py
 Restart=always
 RestartSec=5
 
@@ -22,16 +22,16 @@ WantedBy=network.target
 
 
 команда для инициализации автозагрузки скрипта
-systemctl enable tg_swleak_bath1.service
+systemctl enable название_скрипта.service
 
 команда запуска скрипта через systemctl
-systemctl start tg_swleak_bath1.service
+systemctl start название_скрипта.service
 
 команда остановки скрипта через systemctl
-systemctl stop tg_swleak_bath1.service
+systemctl stop название_скрипта.service
 
 команда отключения автозагрузки скрипта
-systemctl disable tg_swleak_bath1.service
+systemctl disable название_скрипта.service
 
 
-Если нужно запустить несколько скриптов, сделайте копии
+Если нужно запустить несколько скриптов, сделайте копии под разными именами
