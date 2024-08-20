@@ -1,0 +1,34 @@
+//_______________Умный дом______________//
+
+               {
+           id: 'id_device_26',
+           name: 'Умный дом',
+           room: 'Зал',
+           type: 'devices.types.other',
+           mqtt: [
+
+               {
+                    instance: 'on',
+                    set: 'zigbee2mqtt/command/reboot',
+                    state: 'zigbee2mqtt/command/reboot',
+                },
+
+            ],
+            valueMapping: [
+                {
+                    type: 'on_off',
+                    mapping: [[false, true], ['off', 'on']], // [yandex, mqtt]
+                },
+            ],
+
+            capabilities: [
+                {
+                    type: 'devices.capabilities.on_off',
+                    retrievable: true,
+                     reportable: true,
+                },
+            ],
+
+        },
+
+//______________Конец Умный дом_______//
