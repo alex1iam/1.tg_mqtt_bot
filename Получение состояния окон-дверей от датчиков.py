@@ -3,8 +3,8 @@ import telegram
 from datetime import datetime
 
 # Токен и чат ID
-bot_token = '5499782833:AAFqqw1Tk9omTF3MyMPOf6QX6VyTf6wTxY4'
-chat_id = '1455647242'
+bot_token = '12345678903:AAaaaaaaaaaaaaaaaaa'
+chat_id = '0987654321'
 
 # Создаем бота
 bot = telegram.Bot(token=bot_token)
