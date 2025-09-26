@@ -1,70 +1,155 @@
 import paho.mqtt.client as mqtt
 import telegram
+from datetime import datetime
+import time
 
+# === Настройки ===
+bot_token = '1234567890:qwweerfgfhjk'
+mqtt_broker = "localhost"
+mqtt_port = 1883
 
-# Токен бота в телеграме
-bot_token = '1234567890:Aqwertyuiop'
-# ID чата
-chat_id = '0987654321'
-# Создаем бота
 bot = telegram.Bot(token=bot_token)
-# Создаем клиента для MQTT
-client = mqtt.Client()
-# Подключаемся к брокеру
-client.connect("localhost", 1883, 60)
-# Подписываемся на топик №1
-client.subscribe("zigbee2mqtt/8187. ВАННАЯ Датчик протечки/water_leak")
 
-# Устанавливаем переменную для хранения предыдущего значения топика
-prev_topic_value = None
-mapp_topic_value = ""
+# === Датчики протечки ===
+leak_sensors = [
+    "zigbee2mqtt/4db7. КУХНЯ Датчик протечки/water_leak",
+    "zigbee2mqtt/4d9a. КУХНЯ Датчик протечки/water_leak"
+]
 
-# Обработчик подключения к MQTT
+# === Клапаны (базовые топики без /state и /set) ===
+valves_base = [
+    "zigbee2mqtt/7a73. ВАННАЯ Клапан холодной воды",
+    "zigbee2mqtt/d55b. ВАННАЯ Клапан горячей воды"
+]
+
+# Топики состояния и команд
+valves = [f"{base}/state" for base in valves_base]
+valve_commands = {base: f"{base}/set" for base in valves_base}
+
+# Состояния клапанов и флаги уведомлений
+valve_states = {topic: None for topic in valves}  # 'on' или 'off'
+forced_closed_sent = {topic: False for topic in valves}
+all_valves_closed_notified = False
+all_valves_open_notified = False
+
+# Активные протечки
+active_leaks = set()
+
+# === Утилиты ===
+def send_telegram(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        bot.sendMessage(chat_id=chat_id, text=f"{timestamp} — {message}")
+    except Exception as e:
+        print("Ошибка Telegram:", e)
+
+def get_device_name_from_topic(topic):
+    name = topic
+    if name.startswith("zigbee2mqtt/"):
+        name = name[len("zigbee2mqtt/"):]
+    return name.rsplit("/", 1)[0]
+
+# === Обновление состояния клапана ===
+def update_valve_state(topic, state):
+    global all_valves_closed_notified, all_valves_open_notified
+    previous_state = valve_states[topic]
+    valve_states[topic] = state
+
+    device_name = get_device_name_from_topic(topic)
+
+    # Уведомления о срабатывании
+    if state == "off" and previous_state != "off":
+        send_telegram(f"🔴 {device_name}: вода перекрыта")
+        forced_closed_sent[topic] = False
+    elif state == "on" and previous_state != "on":
+        send_telegram(f"🟢 {device_name}: вода включена")
+        # Принудительное закрытие при активной протечке
+        if active_leaks and not forced_closed_sent[topic]:
+            # Используем исходный словарь valve_commands
+            base_topic = get_device_name_from_topic(topic)
+            cmd_topic = None
+            for base, command in valve_commands.items():
+                if base_topic in base:
+                    cmd_topic = command
+                    break
+            if cmd_topic:
+                client.publish(cmd_topic, "OFF")
+                send_telegram(f"🚨 Протечка активна, принудительно перекрыт клапан: {base_topic}")
+                forced_closed_sent[topic] = True
+
+    # Проверка всех клапанов
+    if all(s == "off" for s in valve_states.values()):
+        if not all_valves_closed_notified:
+            send_telegram("🔒 Все клапаны перекрыты")
+            all_valves_closed_notified = True
+            all_valves_open_notified = False
+    elif all(s == "on" for s in valve_states.values()):
+        if not all_valves_open_notified:
+            send_telegram("🔓 Все клапаны открыты")
+            all_valves_open_notified = True
+            all_valves_closed_notified = False
+    else:
+        all_valves_closed_notified = False
+        all_valves_open_notified = False
+
+# === Запрос текущего состояния клапанов при старте ===
+def request_valves_state(client):
+    for base in valves_base:
+        get_topic = f"{base}/get"
+        client.publish(get_topic, '{"state":""}')
+        print(f"Запрошено состояние клапана: {get_device_name_from_topic(base)}")
+
+# === MQTT callbacks ===
 def on_connect(client, userdata, flags, rc):
-    print("Connected with result code "+str(rc))
+    print("MQTT connected")
+    for topic in leak_sensors + valves:
+        client.subscribe(topic)
+    # Запрашиваем текущее состояние клапанов
+    request_valves_state(client)
 
-# Функция для работы с сообщениями топиков
 def on_message(client, userdata, msg):
-    global prev_topic_value
-    global mapp_topic_value
-    # Получаем текущее значение топика датчика протечки и присваиваем переменной
-    curr_topic_value = str(msg.payload.decode("utf-8"))
-#    print(msg.topic+" "+str(msg.payload.decode("utf-8")))
-    # Проверяем значение топика и мапим его
-    if curr_topic_value == "true":
-     mapp_topic_value = 'Обнаружена протечка'
-    # Сразу грузим топик клапана, чтобы перекрыть воду
-     client.publish("zigbee2mqtt/639b. ВАННАЯ Клапан горячей воды/set", "ON")
-    # и отправляем сообщение в телеграмм, что вода перекрыта.
-    # Спам в телегу будет идти на каждый ивент от датчика протечки,
-    # но так как заливает, то это как раз дополнительные напоминания
-     bot.send_message(chat_id=chat_id, text=msg.topic+":: Отправлена команда перекрыть горячую воду")
+    topic = msg.topic
+    payload = msg.payload.decode("utf-8").strip().lower()
+    device_name = get_device_name_from_topic(topic)
 
-    if curr_topic_value == 'false':
-     mapp_topic_value = 'Протечка не обнаружена или устранена'
-     # Грузим топик клапана, чтобы включить воду, но отдельно в телегу пока не сообщаем
-#    # при необходимости можно отправить сообщение в телеграмм, что вода открыта (если убрать решетки)
-#     bot.send_message(chat_id=chat_id, text=msg.topic+":: Отправлена команда открыть горячую воду")
+    # --- Датчики протечки ---
+    if topic in leak_sensors:
+        if payload == "true":
+            if device_name not in active_leaks:
+                active_leaks.add(device_name)
+                send_telegram(f"⚠️ Обнаружена протечка! ({device_name})")
+                # Перекрываем все клапаны
+                for base, cmd_topic in valve_commands.items():
+                    client.publish(cmd_topic, "OFF")
+                    send_telegram(f"🚨 Отправлена команда на перекрытие клапана: {get_device_name_from_topic(base)}")
+        elif payload == "false":
+            if device_name in active_leaks:
+                active_leaks.remove(device_name)
+                send_telegram(f"✅ Протечка устранена ({device_name})")
 
-   # Проверяем, что значение содержимого топика изменилось
-    if prev_topic_value != curr_topic_value:
-      # Отправляем сообщение в телеграмм о статусе протечки
-      bot.send_message(chat_id=chat_id, text=msg.topic+":: "+mapp_topic_value+". Текущее время: "+datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-      # проверяем, что протечка устранена и сообщаем в телеграм
-      if curr_topic_value == 'false':
-       bot.send_message(chat_id=chat_id, text=msg.topic+":: Отправлена команда открыть горячую воду")
-       client.publish("zigbee2mqtt/639b. ВАННАЯ Клапан горячей воды/set", "OFF")
-      # Также можно сделать подмену  названия топика на любую фразу:
-#     bot.send_message(chat_id=chat_id, text="Сюда впихнуть что хочется вместо названия топика mqtt: "+mapp_topic_value)
-      # Обновляем предыдущее значение топика
-      prev_topic_value = curr_topic_value
-#     print(msg.topic+" "+str(msg.payload.decode("utf-8")))
+    # --- Клапаны ---
+    elif topic in valves:
+        if payload in ["off", "0"]:
+            update_valve_state(topic, "off")
+        elif payload in ["on", "1"]:
+            update_valve_state(topic, "on")
+        else:
+            print(f"Неизвестное состояние клапана: {topic} = {payload}")
 
+# === Ручное открытие всех клапанов ===
+def open_all_valves(client):
+    for base, cmd_topic in valve_commands.items():
+        client.publish(cmd_topic, "ON")
+        send_telegram(f"🔔 Отправлена команда на открытие клапана: {get_device_name_from_topic(base)}")
 
-# Устанавливаем функцию для обработки сообщений
-client.on_connect = on_connect
-client.on_message = on_message
+# === MQTT клиент ===
+client = mqtt.Client()
 
+def main():
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect(mqtt_broker, mqtt_port, 60)
+    client.loop_forever()
 
-# Запускаем прослушивание сообщений
-client.loop_forever()
+if __name__ == "__main__":
+    main()
