@@ -1,25 +1,32 @@
 import paho.mqtt.client as mqtt
+import configparser
 import telegram
-from datetime import datetime
 import time
+from datetime import datetime
 
-# === Настройки ===
-bot_token = '1234567890:qwweerfgfhjk'
-mqtt_broker = "localhost"
-mqtt_port = 1883
+# === Чтение конфигураций ===
+config = configparser.ConfigParser()
+config.read('/opt/tg_mqtt_bot/settings.ini')
 
+# Настройки из settings.ini
+mqtt_broker = config['MQTT']['ip']
+mqtt_port = int(config['MQTT']['port'])
+bot_token = config['TELEGRAM']['bot_token']
+chat_id = int(config['TELEGRAM']['chat_id'])
 bot = telegram.Bot(token=bot_token)
 
 # === Датчики протечки ===
 leak_sensors = [
+    "zigbee2mqtt/4d9a. КУХНЯ Датчик протечки/water_leak",
     "zigbee2mqtt/4db7. КУХНЯ Датчик протечки/water_leak",
-    "zigbee2mqtt/4d9a. КУХНЯ Датчик протечки/water_leak"
+    "zigbee2mqtt/4d61. ВАННАЯ Датчик протечки/water_leak",
+    "zigbee2mqtt/3b74. ВАННАЯ Датчик протечки/water_leak"
 ]
 
 # === Клапаны (базовые топики без /state и /set) ===
 valves_base = [
-    "zigbee2mqtt/7a73. ВАННАЯ Клапан холодной воды",
-    "zigbee2mqtt/d55b. ВАННАЯ Клапан горячей воды"
+    "zigbee2mqtt/37cf. ВАННАЯ Клапан холодной воды",
+    "zigbee2mqtt/639b. ВАННАЯ Клапан горячей воды"
 ]
 
 # Топики состояния и команд
@@ -27,7 +34,7 @@ valves = [f"{base}/state" for base in valves_base]
 valve_commands = {base: f"{base}/set" for base in valves_base}
 
 # Состояния клапанов и флаги уведомлений
-valve_states = {topic: None for topic in valves}  # 'on' или 'off'
+valve_states = {topic: None for topic in valves}
 forced_closed_sent = {topic: False for topic in valves}
 all_valves_closed_notified = False
 all_valves_open_notified = False
@@ -63,9 +70,7 @@ def update_valve_state(topic, state):
         forced_closed_sent[topic] = False
     elif state == "on" and previous_state != "on":
         send_telegram(f"🟢 {device_name}: вода включена")
-        # Принудительное закрытие при активной протечке
         if active_leaks and not forced_closed_sent[topic]:
-            # Используем исходный словарь valve_commands
             base_topic = get_device_name_from_topic(topic)
             cmd_topic = None
             for base, command in valve_commands.items():
@@ -78,12 +83,12 @@ def update_valve_state(topic, state):
                 forced_closed_sent[topic] = True
 
     # Проверка всех клапанов
-    if all(s == "off" for s in valve_states.values()):
+    if all(s == "off" for s in valve_states.values() if s is not None):
         if not all_valves_closed_notified:
             send_telegram("🔒 Все клапаны перекрыты")
             all_valves_closed_notified = True
-            all_valves_open_notified = False
-    elif all(s == "on" for s in valve_states.values()):
+                        all_valves_open_notified = False
+    elif all(s == "on" for s in valve_states.values() if s is not None):
         if not all_valves_open_notified:
             send_telegram("🔓 Все клапаны открыты")
             all_valves_open_notified = True
@@ -104,7 +109,7 @@ def on_connect(client, userdata, flags, rc):
     print("MQTT connected")
     for topic in leak_sensors + valves:
         client.subscribe(topic)
-    # Запрашиваем текущее состояние клапанов
+    time.sleep(1)
     request_valves_state(client)
 
 def on_message(client, userdata, msg):
@@ -118,7 +123,6 @@ def on_message(client, userdata, msg):
             if device_name not in active_leaks:
                 active_leaks.add(device_name)
                 send_telegram(f"⚠️ Обнаружена протечка! ({device_name})")
-                # Перекрываем все клапаны
                 for base, cmd_topic in valve_commands.items():
                     client.publish(cmd_topic, "OFF")
                     send_telegram(f"🚨 Отправлена команда на перекрытие клапана: {get_device_name_from_topic(base)}")
