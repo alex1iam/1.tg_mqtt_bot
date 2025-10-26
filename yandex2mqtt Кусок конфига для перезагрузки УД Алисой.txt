@@ -3,14 +3,14 @@
                {
            id: 'id_device_26',
            name: 'Умный дом',
-           room: 'Зал',
+           room: 'Дом',
            type: 'devices.types.other',
            mqtt: [
 
                {
                     instance: 'on',
-                    set: 'zigbee2mqtt/command/reboot',
-                    state: 'zigbee2mqtt/command/reboot',
+                    set: 'zigbee2mqtt/command/reboot/system',
+                    state: 'zigbee2mqtt/command/reboot/system',
                 },
 
             ],
@@ -32,3 +32,4 @@
         },
 
 //______________Конец Умный дом_______//
+
