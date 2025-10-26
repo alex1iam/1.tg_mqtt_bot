@@ -1,13 +1,22 @@
 import paho.mqtt.client as mqtt
+import configparser
+import subprocess
 import telegram
+import time
 from datetime import datetime
 
-# Токен и чат ID
-bot_token = '12345678903:AAaaaaaaaaaaaaaaaaa'
-chat_id = '0987654321'
+# === Чтение конфигураций ===
+config = configparser.ConfigParser()
+config.read('/opt/tg_mqtt_bot/settings.ini')
+
+# Настройки из settings.ini
+IP = config['MQTT']['ip']
+PORT = int(config['MQTT']['port'])
+BOT_TOKEN = config['TELEGRAM']['bot_token']
+CHAT_ID = int(config['TELEGRAM']['chat_id'])
 
 # Создаем бота
-bot = telegram.Bot(token=bot_token)
+bot = telegram.Bot(token=BOT_TOKEN)
 
 # Список сенсоров: топик -> (название, текст_при_true, текст_при_false)
 sensors = {
@@ -25,7 +34,6 @@ prev_values = {topic: None for topic in sensors.keys()}
 # Обработчик подключения
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
-    # Подписываемся на все топики
     for topic in sensors.keys():
         client.subscribe(topic)
         print(f"Subscribed to {topic}")
@@ -33,25 +41,27 @@ def on_connect(client, userdata, flags, rc):
 # Обработчик сообщений
 def on_message(client, userdata, msg):
     global prev_values
-
-    curr_value = str(msg.payload.decode("utf-8"))
+    curr_value = str(msg.payload.decode("utf-8")).lower()
     topic = msg.topic
 
     if topic not in sensors:
-        return  # Игнорируем неизвестные топики
+        return
 
     name, text_true, text_false = sensors[topic]
 
-    if curr_value == "true":
+    if curr_value in ["true", "1"]:
         status_text = text_true
-    elif curr_value == "false":
+    elif curr_value in ["false", "0"]:
         status_text = text_false
     else:
         status_text = f"Неизвестное значение: {curr_value}"
 
     if prev_values[topic] != curr_value:
         message = f"{name}: {status_text}. Текущее время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        bot.sendMessage(chat_id=chat_id, text=message)
+        try:
+            bot.sendMessage(chat_id=CHAT_ID, text=message)
+        except Exception as e:
+            print(f"Ошибка отправки сообщения: {e}")
         print(message)
         prev_values[topic] = curr_value
 
@@ -61,7 +71,7 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 # Подключаемся к брокеру
-client.connect("localhost", 1883, 60)
+client.connect(IP, PORT, 60)
 
 # Запускаем цикл
 client.loop_forever()
