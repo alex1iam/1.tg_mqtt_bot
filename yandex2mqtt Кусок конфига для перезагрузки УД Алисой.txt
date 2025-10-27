@@ -33,3 +33,37 @@
 
 //______________Конец Умный дом_______//
 
+//_______________Zigbee2mqtt______________//
+
+               {
+           id: 'id_device_27',
+           name: 'Зигби',
+           room: 'Дом',
+           type: 'devices.types.other',
+           mqtt: [
+
+               {
+                    instance: 'on',
+                    set: 'zigbee2mqtt/command/reboot/z2m_service',
+                    state: 'zigbee2mqtt/command/reboot/z2m_service',
+                },
+
+            ],
+            valueMapping: [
+                {
+                    type: 'on_off',
+                    mapping: [[false, true], ['off', 'on']], // [yandex, mqtt]
+                },
+            ],
+
+            capabilities: [
+                {
+                    type: 'devices.capabilities.on_off',
+                    retrievable: true,
+                     reportable: true,
+                },
+            ],
+
+        },
+
+//______________Конец Zigbee2mqtt_______//
